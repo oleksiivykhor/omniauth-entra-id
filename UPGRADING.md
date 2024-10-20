@@ -80,8 +80,9 @@ You have two options, should the issue affect you (and it almost certainly will)
 * Otherwise, you should lazy-migrate:
   - As usual, in your OAuth callback handler, `request.env['omniauth.auth'].uid` gives the UID - but now that's the "new" Entra gem's value which includes tenant ID.
   - If you can find a user with that ID, then all good - they've been migrated already or got connected to Entra *after* you started using the updated gem
-  - Otherwise, check `request.env['omniauth.auth'].extra.oid` - this gives the value that the *old Azure ActiveDirectory V2 gem* used as UID
+  - Otherwise, check `request.env['omniauth.auth'].raw_info['oid']` - this gives the value that the *old Azure ActiveDirectory V2 gem* used as UID
   - Look up the user with this ID. If you find them, great; remember to migrate their record by updating their stored auth ID to the new `request.env['omniauth.auth'].uid` value.
+  - For better security add something like an indexed boolean column indicating whether or not the user has been thus migrated and only perform old OID lookups on users which have not yet been migrated.
   - If the user can't be found by either means, then they've not been connected to your system yet. Your existing handling path for such a condition applies.
 
 ### Applications that handle multiple OAuth providers
