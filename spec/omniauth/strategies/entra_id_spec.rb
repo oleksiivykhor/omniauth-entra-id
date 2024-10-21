@@ -46,7 +46,7 @@ RSpec.describe OmniAuth::Strategies::EntraId do
           allow(subject).to receive(:request) { request }
           expect(subject.client.options[:token_url]).to eql('https://my_tenant.b2clogin.com/my_tenant.onmicrosoft.com/my_policy/oauth2/v2.0/token')
         end
-      end
+      end # "context 'when a custom policy and tenant name are present' do"
 
       it 'supports authorization_params' do
         @options = { authorize_params: {prompt: 'select_account'} }
@@ -54,6 +54,94 @@ RSpec.describe OmniAuth::Strategies::EntraId do
         subject.client
         expect(subject.authorize_params[:prompt]).to eql('select_account')
       end
+
+      context 'using client secret flow without client secret' do
+        subject do
+          OmniAuth::Strategies::EntraId.new(app, { client_id: 'id', tenant_id: 'tenant' }.merge(options))
+        end
+
+        it 'raises exception' do
+          expect { subject.client }.to raise_error(ArgumentError, "You must provide either client_secret or certificate_path and tenant_id")
+        end
+      end # "context 'using client secret flow without client secret' do"
+
+      context 'using client assertion flow' do
+        subject do
+          OmniAuth::Strategies::EntraId.new(app, options)
+        end
+
+        it 'raises exception when tenant id is not given' do
+          @options = { client_id: 'id', certificate_path: 'path/to/cert.p12' }
+          expect { subject.client }.to raise_error(ArgumentError, "You must provide either client_secret or certificate_path and tenant_id")
+        end
+
+        it 'raises exception when certificate_path is not given' do
+          @options = { client_id: 'id', tenant_id: 'tenant' }
+          expect { subject.client }.to raise_error(ArgumentError, "You must provide either client_secret or certificate_path and tenant_id")
+        end
+
+        context '#token_params with correctly formatted request' do
+          let(:key) { OpenSSL::PKey::RSA.new(2048) }
+          let(:cert) { OpenSSL::X509::Certificate.new.tap { |cert|
+            cert.subject = cert.issuer = OpenSSL::X509::Name.parse("/CN=test")
+            cert.not_before = Time.now
+            cert.not_after = Time.now + 365 * 24 * 60 * 60
+            cert.public_key = key.public_key
+            cert.serial = 0x0
+            cert.version = 2
+            cert.sign(key, OpenSSL::Digest::SHA256.new)
+          } }
+
+          before do
+            @options = {
+              client_id: 'id',
+              tenant_id: 'tenant',
+              certificate_path: 'path/to/cert.p12'
+            }
+
+            allow(File).to receive(:read)
+            allow(OpenSSL::PKCS12).to receive(:new).and_return(OpenSSL::PKCS12.create('pass', 'name', key, cert))
+            allow(SecureRandom).to receive(:uuid).and_return('unique-jti')
+
+            allow(subject).to receive(:request) { request }
+            subject.client
+          end
+
+          it 'has correct tenant id' do
+            expect(subject.options.token_params[:tenant]).to eql('tenant')
+          end
+
+          it 'has correct client id' do
+            expect(subject.options.token_params[:client_id]).to eql('id')
+          end
+
+          it 'has correct client_assertion_type' do
+            expect(subject.options.token_params[:client_assertion_type]).to eql('urn:ietf:params:oauth:client-assertion-type:jwt-bearer')
+          end
+
+          context 'client assertion' do
+            it 'has correct claims' do
+              jwt = subject.options.token_params[:client_assertion]
+              decoded_jwt = JWT.decode(jwt, nil, false).first
+
+              expect(decoded_jwt['aud']).to eql('https://login.microsoftonline.com/tenant/oauth2/v2.0/token')
+              expect(decoded_jwt['exp']).to be_within(5).of(Time.now.to_i + 300)
+              expect(decoded_jwt['iss']).to eql('id')
+              expect(decoded_jwt['jti']).to eql('unique-jti')
+              expect(decoded_jwt['nbf']).to be_within(5).of(Time.now.to_i)
+              expect(decoded_jwt['sub']).to eql('id')
+            end
+
+            it 'contains x5c and x5t headers' do
+              jwt = subject.options.token_params[:client_assertion]
+              headers = JWT.decode(jwt, nil, false).last
+
+              expect(headers['x5c']).to be_an_instance_of(Array)
+              expect(headers['x5t']).to be_a(String)
+            end
+          end # "context 'client assertion' do"
+        end # "context '#token_params with correctly formatted request' do"
+      end # "context 'using client assertion flow' do"
 
       describe "overrides" do
         it 'should override domain_hint' do
@@ -70,10 +158,9 @@ RSpec.describe OmniAuth::Strategies::EntraId do
           subject.client
           expect(subject.authorize_params[:prompt]).to eql('consent')
         end
-      end
-    end
-
-  end
+      end # "describe "overrides" do"
+    end # "describe '#client' do"
+  end # "describe 'static configuration' do"
 
   describe 'static configuration - german' do
     let(:options) { @options || {} }
@@ -104,6 +191,14 @@ RSpec.describe OmniAuth::Strategies::EntraId do
         expect(subject.authorize_params[:scope]).to eql('openid profile email')
       end
 
+      context 'when a custom policy and tenant name are present' do
+        it 'generates the B2C URL (which does not include locale)' do
+          @options = { custom_policy: 'my_policy', tenant_name: 'my_tenant' }
+          allow(subject).to receive(:request) { request }
+          expect(subject.client.options[:token_url]).to eql('https://my_tenant.b2clogin.com/my_tenant.onmicrosoft.com/my_policy/oauth2/v2.0/token')
+        end
+      end # "context 'when a custom policy and tenant name are present' do"
+
       describe "overrides" do
         it 'should override domain_hint' do
           @options = {domain_hint: 'hint'}
@@ -111,9 +206,9 @@ RSpec.describe OmniAuth::Strategies::EntraId do
           subject.client
           expect(subject.authorize_params[:domain_hint]).to eql('hint')
         end
-      end
-    end
-  end
+      end # "describe "overrides" do"
+    end # "describe '#client' do"
+  end # "describe 'static configuration - german' do"
 
   describe 'static common configuration' do
     let(:options) { @options || {} }
@@ -133,8 +228,8 @@ RSpec.describe OmniAuth::Strategies::EntraId do
       it 'has correct token url' do
         expect(subject.client.options[:token_url]).to eql('https://login.microsoftonline.com/common/oauth2/v2.0/token')
       end
-    end
-  end
+    end # "describe '#client' do"
+  end # "describe 'static common configuration' do"
 
   describe 'static configuration with on premise ADFS' do
     let(:options) { @options || {} }
@@ -152,8 +247,8 @@ RSpec.describe OmniAuth::Strategies::EntraId do
         allow(subject).to receive(:request) { request }
         expect(subject.client.options[:token_url]).to eql('https://login.contoso.com/adfs/oauth2/token')
       end
-    end
-  end
+    end # "describe '#client' do"
+  end # "describe 'static configuration with on premise ADFS' do"
 
   describe 'dynamic configuration' do
     let(:provider_klass) {
@@ -215,9 +310,8 @@ RSpec.describe OmniAuth::Strategies::EntraId do
       #     expect(subject.authorize_params[:domain_hint]).to eql('hint')
       #   end
       # end
-    end
-
-  end
+    end # "describe '#client' do"
+  end # "describe 'dynamic configuration' do"
 
   describe 'dynamic configuration - german' do
     let(:provider_klass) {
@@ -282,9 +376,8 @@ RSpec.describe OmniAuth::Strategies::EntraId do
       #     expect(subject.authorize_params[:domain_hint]).to eql('hint')
       #   end
       # end
-    end
-
-  end
+    end # "describe '#client' do"
+  end # "describe 'dynamic configuration - german' do"
 
   describe 'dynamic common configuration' do
     let(:provider_klass) {
@@ -324,8 +417,8 @@ RSpec.describe OmniAuth::Strategies::EntraId do
         subject.client
         expect(subject.authorize_params[:scope]).to eql('openid email offline_access Calendars.Read')
       end
-    end
-  end
+    end # "describe '#client' do"
+  end # "describe 'dynamic common configuration' do"
 
   describe 'dynamic configuration with on premise ADFS' do
     let(:provider_klass) {
@@ -371,8 +464,8 @@ RSpec.describe OmniAuth::Strategies::EntraId do
       it 'has correct token url' do
         expect(subject.client.options[:token_url]).to eql('https://login.contoso.com/adfs/oauth2/token')
       end
-    end
-  end
+    end # "describe '#client' do"
+  end # "describe 'dynamic configuration with on premise ADFS' do"
 
   describe 'raw_info' do
     let(:issued_at ) {  Time.now.utc.to_i         }
