@@ -11,7 +11,8 @@ module OmniAuth
       option :tenant_provider, nil
       option :jwt_leeway,      60
 
-      DEFAULT_SCOPE = 'openid profile email'
+      DEFAULT_SCOPE    = 'openid profile email'
+      COMMON_TENANT_ID = 'common'
 
       # The tenant_provider must return client_id, client_secret and,
       # optionally, tenant_id and base_url.
@@ -43,7 +44,7 @@ module OmniAuth
         options.tenant_id = if provider.respond_to?(:tenant_id)
           provider.tenant_id
         else
-          'common'
+          COMMON_TENANT_ID
         end
 
         options.base_url = if provider.respond_to?(:base_url )
@@ -72,14 +73,14 @@ module OmniAuth
           'oauth2/v2.0'
         end
 
-        base_url = if options.custom_policy && options.tenant_name
+        tenanted_endpoint_base_url = if options.custom_policy && options.tenant_name
           "https://#{options.tenant_name}.b2clogin.com/#{options.tenant_name}.onmicrosoft.com/#{options.custom_policy}"
         else
           "#{options.base_url}/#{options.tenant_id}"
         end
 
-        options.client_options.authorize_url = "#{base_url}/#{oauth2}/authorize"
-        options.client_options.token_url     = "#{base_url}/#{oauth2}/token"
+        options.client_options.authorize_url = "#{tenanted_endpoint_base_url}/#{oauth2}/authorize"
+        options.client_options.token_url     = "#{tenanted_endpoint_base_url}/#{oauth2}/token"
 
         super
       end
@@ -136,7 +137,11 @@ module OmniAuth
           # sense to verify the token issuer, because the value of 'iss' in the
           # token depends on the 'tid' in the token itself.
           #
-          issuer = options.tenant_id.nil? ? nil : "#{options.base_url}/#{options.tenant_id}/v2.0"
+          issuer = if options.tenant_id.nil? || options.tenant_id == COMMON_TENANT_ID
+            nil
+          else
+            "#{options.base_url || BASE_URL}/#{options.tenant_id}/v2.0"
+          end
 
           # https://learn.microsoft.com/en-us/entra/identity-platform/id-tokens#validate-tokens
           #

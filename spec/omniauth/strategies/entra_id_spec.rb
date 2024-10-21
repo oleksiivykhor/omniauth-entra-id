@@ -467,7 +467,7 @@ RSpec.describe OmniAuth::Strategies::EntraId do
     end # "describe '#client' do"
   end # "describe 'dynamic configuration with on premise ADFS' do"
 
-  describe 'raw_info' do
+  describe 'raw_info and validation' do
     let(:issued_at ) {  Time.now.utc.to_i         }
     let(:expires_at) { (Time.now.utc + 3600).to_i }
 
@@ -476,7 +476,6 @@ RSpec.describe OmniAuth::Strategies::EntraId do
     end
 
     let(:id_token_info) do
-
       {
         ver:                '2.0',
         iss:                'https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0',
@@ -603,15 +602,55 @@ RSpec.describe OmniAuth::Strategies::EntraId do
       end
     end # "context 'with an invalid audience' do"
 
-    context 'with an invalid issuer' do
-      subject do
-        OmniAuth::Strategies::EntraId.new(app, {client_id: 'id', client_secret: 'secret', tenant_id: 'test-tenant'})
-      end
+    context 'issuers' do
+      context 'when valid' do
+        subject do
+          OmniAuth::Strategies::EntraId.new(app, {client_id: 'id', client_secret: 'secret', tenant_id: '9188040d-6c67-4c5b-b112-36a304b66dad'})
+        end
 
-      it 'fails validation' do
-        expect { subject.info }.to raise_error(JWT::InvalidIssuerError)
-      end
-    end # "context 'with an invalid issuer' do"
+        it 'passes validation' do
+          expect { subject.info }.to_not raise_error()
+        end
+      end # "context 'when valid' do"
+
+      context 'when invalid' do
+        subject do
+          OmniAuth::Strategies::EntraId.new(app, {client_id: 'id', client_secret: 'secret', tenant_id: 'a-mismatched-tenant-id'})
+        end
+
+        it 'fails validation' do
+          expect { subject.info }.to raise_error(JWT::InvalidIssuerError)
+        end
+      end # "context 'when invalid' do"
+
+      context 'multi-tenant' do
+        let(:id_token_info) do
+          hash = super()
+          hash['iss'] = 'invalid issuer that should be ignored'
+          hash
+        end
+
+        context 'no tenant specified' do
+          subject do
+            OmniAuth::Strategies::EntraId.new(app, {client_id: 'id', client_secret: 'secret', tenant_id: nil})
+          end
+
+          it 'skips issuer validation since tenant ID is unknown' do
+            expect { subject.info }.to_not raise_error()
+          end
+        end # "context 'no tenant specified' do"
+
+        context '"common" tenant specified' do
+          subject do
+            OmniAuth::Strategies::EntraId.new(app, {client_id: 'id', client_secret: 'secret', tenant_id: OmniAuth::Strategies::EntraId::COMMON_TENANT_ID})
+          end
+
+          it 'skips issuer validation since tenant ID is unknown' do
+            expect { subject.info }.to_not raise_error()
+          end
+        end # "context '"common" tenant specified' do"
+      end # "context 'multi-tenant' do"
+    end # "context 'issuers' do"
 
     context 'with an invalid not_before' do
       let(:issued_at) { (Time.now.utc + 70).to_i } # Invalid because leeway is 60 seconds
@@ -667,7 +706,7 @@ RSpec.describe OmniAuth::Strategies::EntraId do
         expect { subject.info }.to raise_error(JWT::ExpiredSignature)
       end
     end # "context 'with an expired token' do"
-  end   # "describe 'raw_info' do"
+  end # "describe 'raw_info and validation' do"
 
   describe 'callback_url' do
     subject do
