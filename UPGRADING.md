@@ -94,4 +94,4 @@ In that case, you will need to migrate records from the old `azure_activedirecto
 ### Breaking changes that depend on whether or not you use a certain feature
 
 * If you refer to `OmniAuth::Strategies::AzureActivedirectoryV2` at all, then this becomes `OmniAuth::Strategies::EntraId` (note lower case "d").
-* `base_azure_url` option renamed to just `base_url`, corresponding rename of `OmniAuth::Strategies::AzureActivedirectoryV2::BASE_AZURE_URL` to `OmniAuth::Strategies::EntraId::BASE_URL`.
+* `base_azure_url` option renamed to just `base_url` with corresponding rename of `OmniAuth::Strategies::AzureActivedirectoryV2::BASE_AZURE_URL` to `OmniAuth::Strategies::EntraId::BASE_URL`.

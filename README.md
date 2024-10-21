@@ -4,14 +4,14 @@
 [![Build Status](https://github.com/RIPAGlobal/omniauth-entra-id/actions/workflows/master.yml/badge.svg)](https://github.com/RIPAGlobal/omniauth-entra-id/actions)
 [![License](https://img.shields.io/github/license/RIPAGlobal/omniauth-entra-id.svg)](LICENSE.txt)
 
-**IMPORTANT: V2 is end-of-life** and superseded by a renamed gem, since Microsoft in their "wisdom" renamed Azure AD to Entra ID. A gem using the old name will become increasingly hard for people to 'discover'. The major version bump provides an opportunity to fix a few things via breaking changes, too. Please switch to `omniauth-entra-id`.
-
 OAuth 2 authentication with [Entra ID API](https://learn.microsoft.com/en-us/entra/identity-platform/v2-overview). Rationale:
 
 * https://github.com/marknadig/omniauth-azure-oauth2 is no longer maintained.
 * https://github.com/marknadig/omniauth-azure-oauth2/pull/29 contains important additions.
 
 This gem combines the two and makes some changes to support the Entra API. The old ActiveDirectory V1 API used OpenID Connect. If you need this, a gem from Microsoft [is available here](https://github.com/AzureAD/omniauth-azure-activedirectory), but seems to be abandoned.
+
+If upgrading from older versions of this gem under its old name of "Azure ActiveDirectory V2", please follow the instructions in [`UPGRADING.md`](UPGRADING.md).
 
 
 
@@ -51,7 +51,7 @@ In most cases, you only want to receive 'verified' email addresses in your appli
 You can do something like this for a static / fixed configuration:
 
 ```ruby
-use OmniAuth::Builder do
+Rails.application.config.middleware.use OmniAuth::Builder do
   provider(
     :entra_id,
     {
@@ -62,10 +62,10 @@ use OmniAuth::Builder do
 end
 ```
 
-...or, if using a custom provider class (called `YouTenantProvider` in this example):
+...or, if using a custom provider class (called `YouTenantProvider` in this example, described in more detail later):
 
 ```ruby
-use OmniAuth::Builder do
+Rails.application.config.middleware.use OmniAuth::Builder do
   provider(
     :entra_id,
     YouTenantProvider
@@ -87,7 +87,7 @@ config.omniauth(
 )
 ```
 
-...or, if using a custom provider class (called `YouTenantProvider` in this example):
+...or, if using a custom provider class (called `YouTenantProvider` in this example, described in more detail later):
 
 ```ruby
 config.omniauth(
@@ -132,11 +132,23 @@ Solve this for B2C use cases by giving your tenant name and custom policy name i
 
 #### Explaining `authorize_params`
 
-The `authorize_params` hash-like object contains key-value pairs which are transformed into URL query string data and added to existing standard OAuth query data in the URL used for the initial redirection from your web site, to the Microsoft Entra login page, at the start of OAuth flow. You can find these listed some way down the table just below an OAuth URL example at:
+The `authorize_params` hash-like object contains key-value pairs which are added to existing standard OAuth data in the initial `POST` request made by this gem from your web site, to the Microsoft Entra login page, at the start of OAuth flow. You can find these listed some way down the table just below an OAuth URL example at:
 
 * https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow#request-an-authorization-code
 
-...looking for in particular items from `prompt` onwards.
+...looking for in particular items from `prompt` onwards. For example, Microsoft say that a prompt option of `select_account` will always lead to the account selection UI to be shown at login, whether or not the user is currently signed into a Microsoft Entra ID account in that browser session. You would active it using options that look something like this in your OmniAuth Builder or Devise setup code:
+
+```ruby
+{
+  client_id:        ENV['ENTRA_CLIENT_ID'],
+  client_secret:    ENV['ENTRA_CLIENT_SECRET']
+  authorize_params: {
+    prompt: 'select_account'
+  }
+}
+```
+
+
 
 #### Dynamic options via a custom provider class
 
@@ -162,6 +174,8 @@ class YouTenantProvider
     if @strategy.request && @strategy.request.params['login_hint']
       ap['login_hint'] = @strategy.request.params['login_hint']
     end
+
+    # (...and/or set other options such as 'prompt' here...)
 
     return ap
   end
