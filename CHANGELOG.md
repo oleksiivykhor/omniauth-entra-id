@@ -1,6 +1,6 @@
 # Change Log
 
-## v3.0.0 (2024-10-21)
+## v3.0.0 (2024-10-22)
 
 * To upgrade from the Azure ActiveDirectory V2 gem, please see [`UPGRADING.md`](UPGRADING.md)
 * Branched from `omniauth-entra-id` version 2.4.0 and renamed to `omniauth-entra-id`
