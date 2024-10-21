@@ -11,7 +11,7 @@ OAuth 2 authentication with [Entra ID API](https://learn.microsoft.com/en-us/ent
 
 This gem combines the two and makes some changes to support the Entra API. The old ActiveDirectory V1 API used OpenID Connect. If you need this, a gem from Microsoft [is available here](https://github.com/AzureAD/omniauth-azure-activedirectory), but seems to be abandoned.
 
-If upgrading from older versions of this gem under its old name of "Azure ActiveDirectory V2", please follow the instructions in [`UPGRADING.md`](UPGRADING.md).
+**If upgrading from older versions of this gem under its old name of "Azure ActiveDirectory V2", please follow the instructions in [`UPGRADING.md`](UPGRADING.md).**
 
 
 
