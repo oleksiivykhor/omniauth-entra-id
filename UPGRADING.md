@@ -65,8 +65,8 @@ omniauth_authorize_url('resource_name_eg_user', 'entra_id', scope: '...')
 
 
 ## Updates due to other breaking changes
-
-### Critical breaking change for all gem users
+### Change affecting all gem users
+#### UIDs will change
 
 This change is for UIDs and is the main reason for creating a V3 gem, whether or not it included the Entra name change.
 
@@ -85,13 +85,68 @@ You have two options, should the issue affect you (and it almost certainly will)
   - For better security add something like an indexed boolean column indicating whether or not the user has been thus migrated and only perform old OID lookups on users which have not yet been migrated.
   - If the user can't be found by either means, then they've not been connected to your system yet. Your existing handling path for such a condition applies.
 
-### Applications that handle multiple OAuth providers
+#### Applications that handle multiple OAuth providers
 
 If your user records contain users that have 'connected' to more than one kind of OAuth provider, then as well as the third party's UID being stored for future logins, you'll most likely have stored the OmniAuth provider name too so that the UID can be looked up in a provider's context (there's no guarantee, of course, that UIDs are unique *between providers* since they're entirely independent entities with their own strategies for allocating unique IDs).
 
 In that case, you will need to migrate records from the old `azure_activedirectory_v2` name to `entra_id`. **Zero-downtime deployment of this change would be very hard since your codebase would need to update from the Azure ActiveDirectory V2 gem to the Entra ID gem with the migration running simultaneously**, so if you need to do such a migration, then you probably should plan for a small maintenance window. At the scheduled time, go into maintenance mode, migrate, deploy, and restore normal service. Even without this, though, the 'worst that can happen' (in theory!) would be temporary user login failures. Either the Entra gem will be causing you to look for a user with an `entra_id` provider but the migration to set this hasn't run yet, or the other way round, with the old gem looking for the old provider name but it's already updated.
 
-### Breaking changes that depend on whether or not you use a certain feature
+#### Example migration code
+
+Suppose you support multiple providers and your User table stores their chosen provider in a column `auth_provider`, with their UID in `auth_uid`. An (irreversible) database migration might do this:
+
+```ruby
+def up
+  add_column :users, :migrated_to_entra, :boolean
+
+  User
+    .where(auth_provider: 'azure_activedirectory_v2')
+    .update_all(
+      auth_provider:     'entra_id',
+      migrated_to_entra: false
+    )
+end
+
+def down
+  raise ActiveRecord::IrreversibleMigration
+end
+```
+
+This means the `migrated_to_entra` column is only ever `false` for existing users that were linked using the V2 gem. Everything else will be at `NULL`. Now you lazy-move those users to the new UID format in the code you use to look up a user in your OmniAuth OAuth 2 callback handler, e.g. via a method such as this:
+
+```ruby
+# Here, "raw_info" comes from e.g.:
+#
+#   request.env['omniauth.auth'].extra&.dig('raw_info') || {}
+#
+def find_user_for_omniauth(auth_provider:, auth_uid:, raw_info:)
+  found_user = User.find_by(
+    auth_provider: auth_provider,
+    auth_uid:      auth_uid
+  )
+
+  if found_user.nil? && auth_provider == 'entra_id'
+    found = User.find_by(
+      auth_provider:     'entra_id',
+      auth_uid:          raw_info['oid'],
+      migrated_to_entra: false
+    )
+
+    if found
+      found.update_columns(
+        auth_uid:          auth_uid,
+        migrated_to_entra: true
+      )
+    end
+  end
+
+  return found_user
+end
+```
+
+Once there are no rows with a `migrated_to_entra` value of `false` for _active_ users, you will be able to drop the column and remove the lazy migration code.
+
+### Other changes that might affect you
 
 * If you refer to `OmniAuth::Strategies::AzureActivedirectoryV2` at all, then this becomes `OmniAuth::Strategies::EntraId` (note lower case "d").
 * `base_azure_url` option renamed to just `base_url` with corresponding rename of `OmniAuth::Strategies::AzureActivedirectoryV2::BASE_AZURE_URL` to `OmniAuth::Strategies::EntraId::BASE_URL`.
