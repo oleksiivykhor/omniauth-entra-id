@@ -233,21 +233,48 @@ RSpec.describe OmniAuth::Strategies::EntraId do
 
   describe 'static configuration with on premise AD FS' do
     let(:options) { @options || {} }
+
     subject do
-      OmniAuth::Strategies::EntraId.new(app, {client_id: 'id', client_secret: 'secret', tenant_id: 'adfs', base_url: 'https://login.contoso.com', adfs: true}.merge(options))
+      OmniAuth::Strategies::EntraId.new(
+        app,
+        {
+          client_id:     'id',
+          client_secret: 'secret',
+          tenant_id:     'adfs',
+          base_url:      'https://login.contoso.com'
+        }.merge(options) # 'adfs' or 'adfs?' is set here, by defining @options
+      )
     end
 
-    describe '#client' do
-      it 'has correct authorize url' do
-        allow(subject).to receive(:request) { request }
-        expect(subject.client.options[:authorize_url]).to eql('https://login.contoso.com/adfs/oauth2/authorize')
+    shared_examples 'an integration aware of AD FS' do
+      describe 'wherein #client' do
+        it 'has correct authorize url' do
+          allow(subject).to receive(:request) { request }
+          expect(subject.client.options[:authorize_url]).to eql('https://login.contoso.com/adfs/oauth2/authorize')
+        end
+
+        it 'has correct token url' do
+          allow(subject).to receive(:request) { request }
+          expect(subject.client.options[:token_url]).to eql('https://login.contoso.com/adfs/oauth2/token')
+        end
+      end # "describe 'wherein #client' do"
+    end # "shared_examples 'an integration aware of AD FS wherein' do"
+
+    context ':adfs option variant' do
+      before :each do
+        @options = { adfs: true }
       end
 
-      it 'has correct token url' do
-        allow(subject).to receive(:request) { request }
-        expect(subject.client.options[:token_url]).to eql('https://login.contoso.com/adfs/oauth2/token')
+      it_behaves_like 'an integration aware of AD FS'
+    end # "context ':adfs option variant' do"
+
+    context ':adfs? option variant' do
+      before :each do
+        @options = { adfs?: true }
       end
-    end # "describe '#client' do"
+
+      it_behaves_like 'an integration aware of AD FS'
+    end # "context ':adfs? option variant' do"
   end # "describe 'static configuration with on premise AD FS' do"
 
   describe 'dynamic configuration' do
