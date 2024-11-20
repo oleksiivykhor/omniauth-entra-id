@@ -1,5 +1,10 @@
 # Change Log
 
+## v3.0.1 (2024-11-21)
+
+* Fixes a minor error in [`UPGRADING.md`](UPGRADING.md) reported in #38 via #40 (thanks to @kennethgeerts)
+* Does not try to verify JWT token issuer with the AD FS tenant `adfs` via #39 (thanks to @washu)
+
 ## v3.0.0 (2024-10-22)
 
 * To upgrade from the Azure ActiveDirectory V2 gem, please see [`UPGRADING.md`](UPGRADING.md)

@@ -231,7 +231,7 @@ RSpec.describe OmniAuth::Strategies::EntraId do
     end # "describe '#client' do"
   end # "describe 'static common configuration' do"
 
-  describe 'static configuration with on premise ADFS' do
+  describe 'static configuration with on premise AD FS' do
     let(:options) { @options || {} }
     subject do
       OmniAuth::Strategies::EntraId.new(app, {client_id: 'id', client_secret: 'secret', tenant_id: 'adfs', base_url: 'https://login.contoso.com', adfs: true}.merge(options))
@@ -248,7 +248,7 @@ RSpec.describe OmniAuth::Strategies::EntraId do
         expect(subject.client.options[:token_url]).to eql('https://login.contoso.com/adfs/oauth2/token')
       end
     end # "describe '#client' do"
-  end # "describe 'static configuration with on premise ADFS' do"
+  end # "describe 'static configuration with on premise AD FS' do"
 
   describe 'dynamic configuration' do
     let(:provider_klass) {
@@ -420,7 +420,7 @@ RSpec.describe OmniAuth::Strategies::EntraId do
     end # "describe '#client' do"
   end # "describe 'dynamic common configuration' do"
 
-  describe 'dynamic configuration with on premise ADFS' do
+  describe 'dynamic configuration with on premise AD FS' do
     let(:provider_klass) {
       Class.new {
         def initialize(strategy)
@@ -465,7 +465,7 @@ RSpec.describe OmniAuth::Strategies::EntraId do
         expect(subject.client.options[:token_url]).to eql('https://login.contoso.com/adfs/oauth2/token')
       end
     end # "describe '#client' do"
-  end # "describe 'dynamic configuration with on premise ADFS' do"
+  end # "describe 'dynamic configuration with on premise AD FS' do"
 
   describe 'raw_info and validation' do
     let(:issued_at ) {  Time.now.utc.to_i         }
@@ -623,7 +623,7 @@ RSpec.describe OmniAuth::Strategies::EntraId do
         end
       end # "context 'when invalid' do"
 
-      context 'multi-tenant' do
+      context 'multi-tenant, AD FS' do
         let(:id_token_info) do
           hash = super()
           hash['iss'] = 'invalid issuer that should be ignored'
@@ -649,7 +649,17 @@ RSpec.describe OmniAuth::Strategies::EntraId do
             expect { subject.info }.to_not raise_error()
           end
         end # "context '"common" tenant specified' do"
-      end # "context 'multi-tenant' do"
+
+        context '"adfs" tenant specified' do
+          subject do
+            OmniAuth::Strategies::EntraId.new(app, {client_id: 'id', client_secret: 'secret', tenant_id: OmniAuth::Strategies::EntraId::AD_FS_TENANT_ID})
+          end
+
+          it 'skips issuer validation since tenant ID is unknown' do
+            expect { subject.info }.to_not raise_error()
+          end
+        end # "context '"common" tenant specified' do"
+      end # "context 'multi-tenant, AD FS' do"
     end # "context 'issuers' do"
 
     context 'with an invalid not_before' do

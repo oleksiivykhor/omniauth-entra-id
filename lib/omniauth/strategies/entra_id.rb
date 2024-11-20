@@ -13,7 +13,8 @@ module OmniAuth
 
       DEFAULT_SCOPE    = 'openid profile email'
       COMMON_TENANT_ID = 'common'
-      ADFS_TENANT_ID = 'adfs'
+      AD_FS_TENANT_ID  = 'adfs'
+
       # The tenant_provider must return client_id, client_secret and,
       # optionally, tenant_id and base_url.
       #
@@ -135,9 +136,17 @@ module OmniAuth
 
           # For multi-tenant apps (the 'common' tenant_id) it doesn't make any
           # sense to verify the token issuer, because the value of 'iss' in the
-          # token depends on the 'tid' in the token itself. We should also skip for ADFS local instance, as we dont put a valid tenant id in its place, but adfs instead
+          # token depends on the 'tid' in the token itself. We should also skip
+          # for AD FS local instances, as we don't put a valid tenant ID in its
+          # place, but "adfs" (see AD_FS_TENANT_ID) instead.
           #
-          issuer = if options.tenant_id.nil? || options.tenant_id == COMMON_TENANT_ID || options.tenant_id == ADFS_TENANT_ID
+          do_not_verify = (
+            options.tenant_id.nil? ||
+            options.tenant_id == COMMON_TENANT_ID ||
+            options.tenant_id == AD_FS_TENANT_ID
+          )
+
+          issuer = if do_not_verify
             nil
           else
             "#{options.base_url || BASE_URL}/#{options.tenant_id}/v2.0"
