@@ -45,7 +45,7 @@ https://example.com/v1/auth/azure_activedirectory_v2/callback
 ...is now:
 
 ```
-https://example.com/v1/auth/entra/callback
+https://example.com/v1/auth/entra_id/callback
 ```
 
 ### URL generation
