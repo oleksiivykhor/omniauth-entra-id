@@ -16,7 +16,7 @@ Gem::Specification.new do |s|
   s.licenses              = [ 'MIT'               ]
   s.homepage              = 'https://github.com/RIPAGlobal/omniauth-entra-id'
 
-  s.required_ruby_version = Gem::Requirement.new('>= 3.0.0')
+  s.required_ruby_version = Gem::Requirement.new('>= 2.7.0')
   s.require_paths         = ['lib']
   s.bindir                = 'exe'
   s.files                 = %w{
